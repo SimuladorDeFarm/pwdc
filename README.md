@@ -15,8 +15,8 @@
 ## Instalación
 
 ```bash
-git clone <url-del-repo>
-cd copiar_ruta
+git clone https://github.com/SimuladorDeFarm/pwdc.git
+cd pwdc
 chmod +x pwdc
 ```
 
