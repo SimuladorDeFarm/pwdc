@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+#
+# pwdc - "pwd + copy"
+# Muestra el directorio actual (o uno dado como argumento) y lo copia
+# al portapapeles, detectando automáticamente qué herramienta de
+# clipboard está disponible en el sistema.
+#
+# Uso:
+#   pwdc            # copia y muestra el directorio actual
+#   pwdc /ruta/dir  # copia y muestra la ruta absoluta de /ruta/dir
+#
+# Salida (exit codes):
+#   0 - copiado correctamente
+#   1 - la ruta indicada no existe
+#   2 - no se encontró ninguna herramienta de clipboard soportada
+
+set -euo pipefail
+
+VERSION="1.0.0"
+
+show_help() {
+    cat <<EOF
+pwdc - muestra y copia una ruta al portapapeles
+
+Uso:
+  pwdc [opciones] [ruta]
+
+Argumentos:
+  ruta            Ruta a copiar (por defecto: directorio actual)
+
+Opciones:
+  -h, --help      Muestra esta ayuda y termina
+  -v, --version   Muestra la versión y termina
+
+Ejemplos:
+  pwdc                 # copia y muestra el directorio actual
+  pwdc /ruta/dir       # copia y muestra la ruta absoluta de /ruta/dir
+  pwdc archivo.txt     # copia y muestra la ruta absoluta del archivo
+
+Herramientas de portapapeles soportadas (detección automática):
+  wl-copy (Wayland), xclip / xsel (X11), pbcopy (macOS),
+  clip.exe (WSL), termux-clipboard-set (Termux/Android)
+
+Códigos de salida:
+  0  copiado correctamente
+  1  la ruta indicada no existe
+  2  no se encontró ninguna herramienta de clipboard soportada
+EOF
+}
+
+case "${1:-}" in
+    -h|--help)
+        show_help
+        exit 0
+        ;;
+    -v|--version)
+        echo "pwdc $VERSION"
+        exit 0
+        ;;
+esac
+
+target="${1:-.}"
+
+if [ ! -e "$target" ]; then
+    echo "pwdc: no existe la ruta '$target'" >&2
+    exit 1
+fi
+
+# Resuelve a ruta absoluta (funciona tanto para archivos como directorios)
+ruta="$(cd "$(dirname "$target")" 2>/dev/null && pwd -P)/$(basename "$target")"
+# Si target era "." o un directorio, cd+pwd ya da la ruta completa sin duplicar basename
+if [ -d "$target" ]; then
+    ruta="$(cd "$target" && pwd -P)"
+fi
+
+copy_to_clipboard() {
+    local text="$1"
+
+    # Wayland
+    if [ -n "${WAYLAND_DISPLAY:-}" ] && command -v wl-copy >/dev/null 2>&1; then
+        printf '%s' "$text" | wl-copy
+        return 0
+    fi
+
+    # X11 - xclip
+    if command -v xclip >/dev/null 2>&1; then
+        printf '%s' "$text" | xclip -selection clipboard
+        return 0
+    fi
+
+    # X11 - xsel
+    if command -v xsel >/dev/null 2>&1; then
+        printf '%s' "$text" | xsel --clipboard --input
+        return 0
+    fi
+
+    # macOS (por si el script se ejecuta ahí)
+    if command -v pbcopy >/dev/null 2>&1; then
+        printf '%s' "$text" | pbcopy
+        return 0
+    fi
+
+    # WSL
+    if command -v clip.exe >/dev/null 2>&1; then
+        printf '%s' "$text" | clip.exe
+        return 0
+    fi
+
+    # Termux (Android)
+    if command -v termux-clipboard-set >/dev/null 2>&1; then
+        printf '%s' "$text" | termux-clipboard-set
+        return 0
+    fi
+
+    return 1
+}
+
+if copy_to_clipboard "$ruta"; then
+    echo "$ruta"
+    echo "[+] Copiado al portapapeles" >&2
+else
+    echo "$ruta"
+    echo "pwdc: no se encontró ninguna herramienta de clipboard (instala wl-clipboard, xclip o xsel)" >&2
+    exit 2
+fi
