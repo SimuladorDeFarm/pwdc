@@ -4,6 +4,9 @@
 
 `pwdc` ("pwd + copy") muestra en pantalla la ruta absoluta del directorio actual (o de la ruta que le indiques) y la copia automáticamente al portapapeles, detectando la herramienta de clipboard disponible en tu sistema.
 
+![screenshot](screenshot_pwdc.png)
+
+
 ## Requisitos
 
 - Bash
